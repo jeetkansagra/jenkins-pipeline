@@ -12,9 +12,15 @@ pipeline {
     
     stage('Checkout') {
       steps {
+        script {
+          // Force clean workspace
+          sh 'rm -rf .git || true'
+          sh 'rm -rf * || true'
+          sh 'rm -rf .* || true'
+        }
         checkout scm
         sh 'echo passed'
-  }
+      }
     }
     stage('Build and Test') {
       steps {
