@@ -11,12 +11,6 @@ pipeline {
         deleteDir()
       }
     }
-    stage('Checkout') {
-      steps {
-        sh 'echo passed'
-        git branch: 'main', "url: https://github.com/jeetkansagra/jenkins-pipeline.git"
-      }
-    }
     stage('Build and Test') {
       steps {
         sh 'ls -ltr'
