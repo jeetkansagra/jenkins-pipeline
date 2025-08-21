@@ -55,6 +55,7 @@ pipeline {
         }
       }
     }
+
     stage('Update Deployment File') {
     environment {
         GIT_REPO_NAME = "jenkins-pipeline"
@@ -63,36 +64,16 @@ pipeline {
     steps {
         withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
             sh '''
-                echo "Current directory:"
-                pwd
-                echo "Contents of current directory:"
-                ls -la
-                echo "Looking for deployment.yml files:"
-                find . -name "*.yml" -o -name "*.yaml"
-                
                 git config user.email "jeetkansagra07@gmail.com"
                 git config user.name "Jeet Kansagra"
                 BUILD_NUMBER=${BUILD_NUMBER}
-                
-                # Try different path variations
-                if [ -f "spring-boot-app-manifests/deployment.yml" ]; then
-                    echo "Found at spring-boot-app-manifests/deployment.yml"
-                    sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" spring-boot-app-manifests/deployment.yml
-                    git add spring-boot-app-manifests/deployment.yml
-                elif [ -f "../spring-boot-app-manifests/deployment.yml" ]; then
-                    echo "Found at ../spring-boot-app-manifests/deployment.yml"
-                    sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" ../spring-boot-app-manifests/deployment.yml
-                    git add ../spring-boot-app-manifests/deployment.yml
-                else
-                    echo "deployment.yml not found in expected locations"
-                    exit 1
-                fi
-
+                sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" spring-boot-app-manifests/deployment.yml
+                git add spring-boot-app-manifests/deployment.yml
                 git commit -m "Update deployment image to version ${BUILD_NUMBER}"
                 git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME} HEAD:main
             '''
         }
     }
-    }
+}
   }
 }
