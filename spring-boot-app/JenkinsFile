@@ -61,39 +61,43 @@ pipeline {
         GIT_REPO_NAME = "jenkins-pipeline"
         GIT_USER_NAME = "jeetkansagra"
     }
-    steps {
-        withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
-            sh '''
-                echo "Current directory:"
-                pwd
-                echo "Contents of current directory:"
-                ls -la
-                echo "Looking for deployment.yml files:"
-                find . -name "*.yml" -o -name "*.yaml"
-                
-                git config user.email "jeetkansagra07@gmail.com"
-                git config user.name "Jeet Kansagra"
-                BUILD_NUMBER=${BUILD_NUMBER}
-                
-                # Try different path variations
-                if [ -f "spring-boot-app-manifests/deployment.yml" ]; then
-                    echo "Found at spring-boot-app-manifests/deployment.yml"
-                    sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" spring-boot-app-manifests/deployment.yml
-                    git add spring-boot-app-manifests/deployment.yml
-                elif [ -f "../spring-boot-app-manifests/deployment.yml" ]; then
-                    echo "Found at ../spring-boot-app-manifests/deployment.yml"
-                    sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" ../spring-boot-app-manifests/deployment.yml
-                    git add ../spring-boot-app-manifests/deployment.yml
-                else
-                    echo "deployment.yml not found in expected locations"
-                    exit 1
-                fi
-
-                git commit -m "Update deployment image to version ${BUILD_NUMBER}"
-                git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME} HEAD:main
-            '''
-        }
-    }
+   stage('Update Deployment File') {
+      environment {
+          GIT_REPO_NAME = "jenkins-pipeline"
+          GIT_USER_NAME = "jeetkansagra"
+      }
+      steps {
+          withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
+              sh '''
+                  git config user.email "jeetkansagra07@gmail.com"
+                  git config user.name "Jeet Kansagra"
+                  BUILD_NUMBER=${BUILD_NUMBER}
+                  
+                  # Show current content
+                  echo "Before update:"
+                  cat spring-boot-app-manifests/deployment.yml
+                  
+                  # Update image tag - handle both cases: replaceImageTag or existing build numbers
+                  sed -i "s|image: jeetkansagra07/ultimate-cicd:.*|image: jeetkansagra07/ultimate-cicd:${BUILD_NUMBER}|g" spring-boot-app-manifests/deployment.yml
+                  sed -i "s/replaceImageTag/${BUILD_NUMBER}/g" spring-boot-app-manifests/deployment.yml
+                  
+                  # Show updated content
+                  echo "After update:"
+                  cat spring-boot-app-manifests/deployment.yml
+                  
+                  git add spring-boot-app-manifests/deployment.yml
+                  
+                  # Only commit and push if there are changes
+                  if git diff --cached --quiet; then
+                      echo "No changes to commit - deployment file already up to date"
+                  else
+                      echo "Changes detected, committing..."
+                      git commit -m "Update deployment image to version ${BUILD_NUMBER}"
+                      git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME} HEAD:main
+                  fi
+              '''
+          }
+      }
     }
   }
 }
