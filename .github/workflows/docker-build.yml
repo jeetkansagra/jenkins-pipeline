@@ -55,7 +55,7 @@ jobs:
 
           cd jenkins-pipeline/spring-boot-app-manifests
 
-          sed -i "s|image: .*|image: jeetkansagra07/ultimate-cicd:${GITHUB_SHA}|" deployment.yaml
+          sed -i "s|image: .*|image: jeetkansagra07/ultimate-cicd:${GITHUB_SHA}|" deployment.yml
 
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
