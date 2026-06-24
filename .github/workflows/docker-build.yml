@@ -38,10 +38,10 @@ jobs:
       - name: Build Docker image
         run: |
           docker build \
-            -t ${{ secrets.DOCKER_USERNAME }}/ultimate-cicd:${{ github.run_number }} \
+            -t ${{ secrets.DOCKER_USERNAME }}/ultimate-cicd:${{ github.sha }} \
             spring-boot-app
 
       # 6. Push Docker image
       - name: Push Docker image
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/ultimate-cicd:${{ github.run_number }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/ultimate-cicd:$${{ github.sha }}
