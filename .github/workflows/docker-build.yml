@@ -6,74 +6,83 @@ on:
       - main
     paths-ignore:
       - 'spring-boot-app-manifests/**'
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Custom image tag (leave empty to use commit SHA)'
+        required: false
+        type: string
+      skip_deploy:
+        description: 'Skip updating the manifests repo'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  IMAGE_NAME: ultimate-cicd
+  DOCKERHUB_USERNAME: jeetkansagra07   # single source of truth, used everywhere below
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-
+    outputs:
+      full_image: ${{ steps.vars.outputs.full_image }}
     steps:
-      # 1. Checkout code
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      # 2. Set up Java (because you are building Spring Boot with Maven)
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
+          cache: maven
 
-      # 3. Build Maven project
+      - name: Compute image tag
+        id: vars
+        run: |
+          if [ -n "${{ inputs.image_tag }}" ]; then
+            TAG="${{ inputs.image_tag }}"
+          else
+            TAG="$(echo ${{ github.sha }} | cut -c1-7)"
+          fi
+          echo "full_image=${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:$TAG" >> "$GITHUB_OUTPUT"
+
       - name: Build with Maven
         run: |
           cd spring-boot-app
           mvn clean package -DskipTests
 
-      # 4. Log in to Docker Hub
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # 5. Build Docker image
-      - name: Build Docker image
-        run: |
-          docker build \
-            -t ${{ secrets.DOCKER_USERNAME }}/ultimate-cicd:${{ github.sha }} \
-            spring-boot-app
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: spring-boot-app
+          push: true
+          tags: ${{ steps.vars.outputs.full_image }}
 
-      # 6. Push Docker image
-      - name: Push Docker image
-        run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/ultimate-cicd:${{ github.sha }}
-
-      # 7. Update ArgoCD manifests repo
+  update-manifest:
+    needs: build-and-push
+    if: ${{ inputs.skip_deploy != true }}
+    runs-on: ubuntu-latest
+    steps:
       - name: Update manifest repo
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
+          IMAGE: ${{ needs.build-and-push.outputs.full_image }}
         run: |
           git clone https://x-access-token:${GH_PAT}@github.com/jeetkansagra/jenkins-pipeline.git
-
           cd jenkins-pipeline/spring-boot-app-manifests
-
-          sed -i "s|image: .*|image: jeetkansagra07/ultimate-cicd:${GITHUB_SHA}|" deployment.yml
-
+          sed -i "s|image: .*|image: ${IMAGE}|" deployment.yml
           cd ..
-
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-
           git add spring-boot-app-manifests/deployment.yml
-
-          git commit -m "Update image to ${GITHUB_SHA}" || exit 0
-
-          echo "==== REMOTES BEFORE ===="
-          git remote -v
-
+          git commit -m "Update image to ${IMAGE}" || exit 0
           git remote set-url origin https://x-access-token:${GH_PAT}@github.com/jeetkansagra/jenkins-pipeline.git
-
-          echo "==== REMOTES AFTER ===="
-          git remote -v
-
           git push origin main
